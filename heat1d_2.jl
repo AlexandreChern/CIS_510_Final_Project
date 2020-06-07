@@ -55,16 +55,16 @@ function time_dependent_heat(k, Δz, Δt, tf ,t1, α, β, initial, exact, bound_
     t = 0:Δt:tf
     M = Integer(ceil((tf-0)/Δt)) # M+1 total temporal nodes
 
-    # A is N-1 by N-1 because it is the interior nodes
+    # A is N+1 by N+1 because it contains boundary points
 
-    # A = (α/Δz^2)*(-2 * sparse(1:N+1,1:N+1,ones(N+1),N+1,N+1) + sparse(2:N,1:N-1,ones(N-1),N+1,N+1) +
-    #     sparse(2:N,3:N+1,ones(N-1),N+1,N+1))
-    # A[1,1]=(α/Δz^2)*1
-    # A[N+1,N+1]=(α/Δz^2)*1
-    # A[2,1]=(α/Δz^2)*1
-    # A[N,N+1]=(α/Δz^2)*1
+    A = (α/Δz^2)*(-2 * sparse(1:N+1,1:N+1,ones(N+1),N+1,N+1) + sparse(2:N,1:N-1,ones(N-1),N+1,N+1) +
+        sparse(2:N,3:N+1,ones(N-1),N+1,N+1))
+    A[1,1]=(α/Δz^2)*1
+    A[N+1,N+1]=(α/Δz^2)*1
+    A[2,1]=(α/Δz^2)*1
+    A[N,N+1]=(α/Δz^2)*1
     #println(A)
-    A = (α/Δz^2)*(-2 * sparse(1:N+1,1:N+1,ones(N+1),N+1,N+1) + sparse(2:N+1,1:N,ones(N),N+1,N+1) + sparse(1:N,2:N+1,ones(N),N+1,N+1))
+    # A = (α/Δz^2)*(-2 * sparse(1:N+1,1:N+1,ones(N+1),N+1,N+1) + sparse(2:N+1,1:N,ones(N),N+1,N+1) + sparse(1:N,2:N+1,ones(N),N+1,N+1))
 
     u = Array{Float64}(zeros(N+1)) # Interior Nodes
     u .= exact(0,Δt,z[1:N+1],α)
@@ -84,40 +84,6 @@ function time_dependent_heat(k, Δz, Δt, tf ,t1, α, β, initial, exact, bound_
 
 end
 
-# function time_dependent_heat_GPU(k, Δz, Δt, tf ,t1, α, β, initial, exact, odesolve,num_th_block=0, num_block=0)
-#     N  = Integer(ceil((10-0)/Δz)) # N+1 total nodes, N-1 interior nodes
-#     z = 0:Δz:10
-#     t = 0:Δt:tf
-#     M = Integer(ceil((tf-0)/Δt)) # M+1 total temporal nodes
-#
-#     # A is N-1 by N-1 because it is the interior nodes
-#
-#     # A = (α/Δz^2)*(-2 * sparse(1:N+1,1:N+1,ones(N+1),N+1,N+1) + sparse(2:N,1:N-1,ones(N-1),N+1,N+1) +
-#     #     sparse(2:N,3:N+1,ones(N-1),N+1,N+1))
-#     # A[1,1]=(α/Δz^2)*1
-#     # A[N+1,N+1]=(α/Δz^2)*1
-#     # A[2,1]=(α/Δz^2)*1
-#     # A[N,N+1]=(α/Δz^2)*1
-#     #println(A)
-#     A = (α/Δz^2)*(-2 * sparse(1:N+1,1:N+1,ones(N+1),N+1,N+1) + sparse(2:N+1,1:N,ones(N),N+1,N+1) + sparse(1:N,2:N+1,ones(N),N+1,N+1))
-#
-#     u = Array{Float64}(zeros(N+1)) # Interior Nodes
-#     u .= exact(0,Δt,z[1:N+1],α)
-#     #println(u)
-#
-#     #(t, U_inter, E_inter) = odesolve(Δt, t1, tf, u, A, my_exact)
-#     (all_t, U, E) = odesolve(z, Δt, t1, tf, u, A, α, β, exact, initial, num_th_block, num_block)
-# #=
-#     init = Array{Float64}(zeros(M+1,2))
-#     init[:,1] .= α
-#     init[:,2] .= β
-#
-#     U .= U_inter#vcat(init[:,1]', U_inter, init[:,2]')
-#     E .= E_inter#vcat(init[:,1]', E_inter, init[:,2]')
-# =#
-#     return (z, t, U, E)
-#
-# end
 
 
 Δz_list = [2, 1, 0.5, 0.25, 0.125]
@@ -182,30 +148,6 @@ end
 
 end
 
-# k = 2.7
-# Cp = 790
-# ρ = 2700
-# Δz = 0.5
-# @show Δz
-# λ = 0.1
-# Δt = round(λ*Δz^2, digits = 12)
-# @show Δt
-# #@assert 1 >= 2 * (k*Δt)/(Δx^2)
-# tf = 480
-# t1 = 0
-# α = k/(ρ*Cp) #Thermal Diffusivity
-# #α =
-# #β =
-# β = init_cond(10) #boundary condition
-# N  = Integer(ceil((10-0)/Δz))
-#
-# num_th_blk = 32
-# num_block = cld(N, num_th_blk)
-#
-# #(x, t, U, E) = time_dependent_heat(k, Δx, Δt, tf ,t1, α, β, f, exact, naive_rk4)
-# time_dependent_heat_GPU(k, Δz, Δt, t1 ,tf, α, β, init_cond, exact, cu_naive_rk4, num_th_blk, num_block)
-
-
 
 function solve_GPU(k,Δz,Δt,t1,tf,α,β,init_cond,exact,num_th_block,num_block)
     N  = Integer(ceil((10-0)/Δz)) # N+1 total nodes, N-1 interior nodes
@@ -213,16 +155,16 @@ function solve_GPU(k,Δz,Δt,t1,tf,α,β,init_cond,exact,num_th_block,num_block)
     t = 0:Δt:tf
     M = Integer(ceil((tf-0)/Δt)) # M+1 total temporal nodes
 
-    # A is N-1 by N-1 because it is the interior nodes
+    # A is N+1 by N+1 because it contains boundary points
 
-    # A = (α/Δz^2)*(-2 * sparse(1:N+1,1:N+1,ones(N+1),N+1,N+1) + sparse(2:N,1:N-1,ones(N-1),N+1,N+1) +
-    #     sparse(2:N,3:N+1,ones(N-1),N+1,N+1))
-    # A[1,1]=(α/Δz^2)*1
-    # A[N+1,N+1]=(α/Δz^2)*1
-    # A[2,1]=(α/Δz^2)*1
-    # A[N,N+1]=(α/Δz^2)*1
+    A = (α/Δz^2)*(-2 * sparse(1:N+1,1:N+1,ones(N+1),N+1,N+1) + sparse(2:N,1:N-1,ones(N-1),N+1,N+1) +
+        sparse(2:N,3:N+1,ones(N-1),N+1,N+1))
+    A[1,1]=(α/Δz^2)*1
+    A[N+1,N+1]=(α/Δz^2)*1
+    A[2,1]=(α/Δz^2)*1
+    A[N,N+1]=(α/Δz^2)*1
     #println(A)
-    A = (α/Δz^2)*(-2 * sparse(1:N+1,1:N+1,ones(N+1),N+1,N+1) + sparse(2:N+1,1:N,ones(N),N+1,N+1) + sparse(1:N,2:N+1,ones(N),N+1,N+1))
+    # A = (α/Δz^2)*(-2 * sparse(1:N+1,1:N+1,ones(N+1),N+1,N+1) + sparse(2:N+1,1:N,ones(N),N+1,N+1) + sparse(1:N,2:N+1,ones(N),N+1,N+1))
 
     u = Array{Float64}(zeros(N+1)) # Interior Nodes
     u .= exact(0,Δt,z[1:N+1],α)
@@ -241,7 +183,7 @@ let
     k = 2.7
     Cp = 790
     ρ = 2700
-    Δz = 1
+    Δz = 2
     @show Δz
     λ = 0.1
     Δt = round(λ*Δz^2, digits = 12)
@@ -259,5 +201,8 @@ let
     num_block = cld(N, num_th_blk)
 
 
-    (all_t, U, E) = solve_GPU(k,Δz,Δt,t1,tf,α,β,init_cond,exact, num_th_blk, num_block)
+    (all_t, cu_U, cu_E) = solve_GPU(k,Δz,Δt,t1,tf,α,β,init_cond,exact, num_th_blk, num_block)
+    @show cu_U[:,end] - cu_E[:,end]
+    (z, t, U, E) = time_dependent_heat(k, Δz, Δt, tf ,t1, α, β, init_cond, exact, surf_bc, naive_rk4, num_th_blk, num_block)
+    @show U[:,end] - E[:,end]
 end
