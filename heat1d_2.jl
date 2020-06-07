@@ -46,7 +46,7 @@ function exact(t,Δt,z,α)
     ω_d = Δt/(24)
     T_a = 30
     ω_a = Δt/(24*365)
-    return init_cond(z) .+ (exp.((-1).*z.*sqrt(2*pi*ω_d/(2α))).*T_d.*sin.(2*pi*ω_d.*t.-z.*sqrt(2*pi*ω_d/(2α))))#+exp.(-z.*sqrt(ω_a/(2α))).*sin.(ω_a.*t.-z.*sqrt(ω_a/(2α))))
+    return init_cond(z)+(exp.((-1).*z.*sqrt(2*pi*ω_d/(2α))).*T_d.*sin.(2*pi*ω_d.*t.-z.*sqrt(2*pi*ω_d/(2α))))#+exp.(-z.*sqrt(ω_a/(2α))).*sin.(ω_a.*t.-z.*sqrt(ω_a/(2α))))
 end
 
 function time_dependent_heat(k, Δz, Δt, tf ,t1, α, β, initial, exact, odesolve,num_th_block=0, num_block=0)
@@ -70,7 +70,9 @@ function time_dependent_heat(k, Δz, Δt, tf ,t1, α, β, initial, exact, odesol
     #println(u)
 
     #(t, U_inter, E_inter) = odesolve(Δt, t1, tf, u, A, my_exact)
-    (t, U, E) = odesolve(z, Δt, t1, tf, u, A, α, β, exact, surf_bc)
+    #(t, U, E) = odesolve(z, Δt, t1, tf, u, A, α, β, exact, surf_bc)
+     (U, E, t) = my_forward_Euler(z, Δt, t1, tf, A, u, N, M, exact, surf_bc, α, β)
+
 #=
     init = Array{Float64}(zeros(M+1,2))
     init[:,1] .= α
@@ -83,69 +85,59 @@ function time_dependent_heat(k, Δz, Δt, tf ,t1, α, β, initial, exact, odesol
 
 end
 
+k = 2.7
+Cp = 790
+ρ = 2700
+Δz = 0.125
+λ = 0.1
+D =
+Δt = round(λ*Δz^2, digits = 12)
+#@assert 1 >= 2 * (k*Δt)/(Δx^2)
+tf = 480
+t1 = 0
+α = k/(ρ*Cp) #Thermal Diffusivity
+#α =
+#β =
+β = init_cond(10) #boundary condition
+N  = Integer(ceil((10-0)/Δz))
 
-Δz_list = [2, 1, 0.5, 0.25, 0.125]
-Δz_listt = [2, 1]
+num_th_blk = 32
+num_block = cld(N, num_th_blk)
 
-for Δz in Δz_listt
-    k = 2.7
-    Cp = 790
-    ρ = 2700
-    # Δz = 1
-    @show Δz
-    λ = 0.1
-    Δt = round(λ*Δz^2, digits = 12)
-    @show Δt
-    #@assert 1 >= 2 * (k*Δt)/(Δx^2)
-    tf = 480
-    t1 = 0
-    α = k/(ρ*Cp) #Thermal Diffusivity
-    #α =
-    #β =
-    β = init_cond(10) #boundary condition
-    N  = Integer(ceil((10-0)/Δz))
+#(x, t, U, E) = time_dependent_heat(k, Δx, Δt, tf ,t1, α, β, f, exact, naive_rk4)
+(z, t, U, E) = time_dependent_heat(k, Δz, Δt, tf ,t1, α, β, init_cond, exact, naive_rk4, num_th_blk, num_block)
 
-    num_th_blk = 32
-    num_block = cld(N, num_th_blk)
+#=
+xfine = 0:Δx/20:1
 
-    #(x, t, U, E) = time_dependent_heat(k, Δx, Δt, tf ,t1, α, β, f, exact, naive_rk4)
-    (z, t, U, E) = time_dependent_heat(k, Δz, Δt, tf ,t1, α, β, init_cond, exact, naive_rk4, num_th_blk, num_block)
+stride_time = 100
 
-    #=
-    xfine = 0:Δx/20:1
+for i = 1:1:10
 
-    stride_time = 100
+    p = plot(x,U[:,i],label = "approx", shape = :circle, color = :blue)
+    ylims!((0,1))
+    display(p)
 
-    for i = 1:1:10
+    Efine = exact(xfine, t[i])
+    pexact = plot!(xfine,Efine, label = "exact", color = :red)
+    display(pexact)
 
-        p = plot(x,U[:,i],label = "approx", shape = :circle, color = :blue)
-        ylims!((0,1))
-        display(p)
-
-        Efine = exact(xfine, t[i])
-        pexact = plot!(xfine,Efine, label = "exact", color = :red)
-        display(pexact)
-
-        sleep(1)
-    end
-
-    =#
-    println("size of E is: ", size(E))
-    @show norm(U-E)
-
-    @show E[:,30]
-    @show U[:,30]
-
-    @show err = sqrt(Δz) * norm(U[:,end]- E[:,end])
-    @show rel_err = norm(U[:,end] - E[:,end])/norm(E[:,end])
-    println(err)
-    for i = size(U,2)
-    p = plot(U[1:end,i],z[1:end],#=label = string("Numerical",string(Δt)),=# yflip = true, shape = :circle, color = :blue)
-    #ylims!((0.0,1.0))
-    xlabel!("Temperature (K)")
-    ylabel!("Depth (m)")
-    pexact = plot!(E[1:end,i],z[1:end], #= label = string("Exact",string(Δt)),=# yflip = true, color = :red)
-    savefig(string("CPUplot",string(Δz),".png"))
+    sleep(1)
 end
+
+=#
+finegrd = 0:0.001:10
+finex = exact(tf, Δt, finegrd, α)
+err = sqrt(Δz) * norm(U[:,end]- E[:,end])
+println(err)
+for i = size(U,2)
+p = plot(U[1:end,i],z[1:end],#=label = string("Numerical",string(Δt)),=# yflip = true, shape = :circle, color = :blue)
+display(p)
+#ylims!((0.0,1.0))
+xlabel!("Temperature (K)")
+ylabel!("Depth (m)")
+pexact = plot!(finex,finegrd, #= label = string("Exact",string(Δt)),=# yflip = true, color = :red)
+display(pexact)
+savefig(string("CPUplot",string(Δz),".png"))
 
 end

@@ -3,6 +3,30 @@ using LinearAlgebra
 #using CUDAdrv
 #using CuArrays
 
+function my_forward_Euler(x, Δt, t1, tf, A, y1, N, M, exact, surf_bc, α, β)
+
+    l = length(y1)
+    U = zeros(Float64,l,M+1)
+    E = zeros(Float64,l,M+1)
+    C = zeros(Float64,l,M+1)
+    y = copy(y1)      # initial guess
+    U[:,1] = y[:]
+    t=t1
+    println(size(A),size(y))
+
+    for n = 2:M+1
+        t=t+Δt
+        y[:] += Δt*(A*y[:])
+        U[:,n] = y[:]
+        E[:,n] = exact(t,Δt,x[:],α)
+        y[1] = surf_bc(t, Δt)
+        y[end] = β
+    end
+
+    return (U, E, t)
+
+end
+
 function naive_rk4(z, Δt, t1, tf, u, A, α, β, exact, bound_cond)
     all_t = t1:Δt:tf
     t = t1
@@ -25,15 +49,15 @@ function naive_rk4(z, Δt, t1, tf, u, A, α, β, exact, bound_cond)
             k[:,1] = A * u[:]
             uk[1] = bound_cond(t+Δt/2, Δt)
             uk[end]=β
-            u1_t_half = Δt/2 * uk[:]
+            u1_t_half = Δt/2 * k[:,1]
             k[:,2] = k[:,1] + A * u1_t_half
             uk[1] = bound_cond(t+Δt, Δt)
             uk[end]=β
-            u2_t_half = Δt/2 * uk[:]
+            u2_t_half = Δt/2 * k[:,2]
             k[:,3] = k[:,1] + A * u2_t_half
             uk[1] = bound_cond(t+2*Δt, Δt)
             uk[end]=β
-            u3 = Δt * uk[:]
+            u3 = Δt * k[:,3]
             k[:,4] = k[:,1] + A * u3
             u[:] = u[:] + Δt/6 * (k[:,1] + 2*k[:,2] + 2*k[:,3] + k[:,4])
             u[1] = bound_cond(t, Δt)
