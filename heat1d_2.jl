@@ -46,7 +46,7 @@ function exact(t,Δt,z,α)
     ω_d = Δt/(24)
     T_a = 30
     ω_a = Δt/(24*365)
-    return init_cond(z)+(exp.((-1).*z.*sqrt(2*pi*ω_d/(2α))).*T_d.*sin.(2*pi*ω_d.*t.-z.*sqrt(2*pi*ω_d/(2α))))#+exp.(-z.*sqrt(ω_a/(2α))).*sin.(ω_a.*t.-z.*sqrt(ω_a/(2α))))
+    return init_cond(z) .+ (exp.((-1).*z.*sqrt(2*pi*ω_d/(2α))).*T_d.*sin.(2*pi*ω_d.*t.-z.*sqrt(2*pi*ω_d/(2α))))#+exp.(-z.*sqrt(ω_a/(2α))).*sin.(ω_a.*t.-z.*sqrt(ω_a/(2α))))
 end
 
 function time_dependent_heat(k, Δz, Δt, tf ,t1, α, β, initial, exact, odesolve,num_th_block=0, num_block=0)
@@ -85,8 +85,9 @@ end
 
 
 Δz_list = [2, 1, 0.5, 0.25, 0.125]
+Δz_listt = [2, 1]
 
-for Δz in Δz_list
+for Δz in Δz_listt
     k = 2.7
     Cp = 790
     ρ = 2700
@@ -129,6 +130,11 @@ for Δz in Δz_list
     end
 
     =#
+    println("size of E is: ", size(E))
+    @show norm(U-E)
+
+    @show E[:,30]
+    @show U[:,30]
 
     @show err = sqrt(Δz) * norm(U[:,end]- E[:,end])
     @show rel_err = norm(U[:,end] - E[:,end])/norm(E[:,end])
