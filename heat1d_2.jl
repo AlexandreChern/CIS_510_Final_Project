@@ -57,13 +57,16 @@ function time_dependent_heat(k, Δz, Δt, tf ,t1, α, β, initial, exact, odesol
 
     # A is N-1 by N-1 because it is the interior nodes
 
-    A = (α/Δz^2)*(-2 * sparse(1:N+1,1:N+1,ones(N+1),N+1,N+1) + sparse(2:N,1:N-1,ones(N-1),N+1,N+1) +
-        sparse(2:N,3:N+1,ones(N-1),N+1,N+1))
-    A[1,1]=(α/Δz^2)*1
-    A[N+1,N+1]=(α/Δz^2)*1
-    A[2,1]=(α/Δz^2)*1
-    A[N,N+1]=(α/Δz^2)*1
-    #println(A)
+    # A = (α/Δz^2)*(-2 * sparse(1:N+1,1:N+1,ones(N+1),N+1,N+1) + sparse(2:N,1:N-1,ones(N-1),N+1,N+1) +
+    #     sparse(2:N,3:N+1,ones(N-1),N+1,N+1))
+    # A[1,1]=(α/Δz^2)*1
+    # A[N+1,N+1]=(α/Δz^2)*1
+    # A[2,1]=(α/Δz^2)*1
+    # A[N,N+1]=(α/Δz^2)*1
+
+    A = (α/Δz^2)*(-2 * sparse(1:N+1,1:N+1,ones(N+1),N+1,N+1) + sparse(2:N+1,1:N,ones(N),N+1,N+1) +
+         sparse(1:N,2:N+1,ones(N),N+1,N+1))
+    
 
     u = Array{Float64}(zeros(N+1)) # Interior Nodes
     u .= exact(0,Δt,z[1:N+1],α)
@@ -88,9 +91,9 @@ end
 k = 2.7
 Cp = 790
 ρ = 2700
-Δz = 0.125
+Δz = 1
 λ = 0.1
-D =
+# D =
 Δt = round(λ*Δz^2, digits = 12)
 #@assert 1 >= 2 * (k*Δt)/(Δx^2)
 tf = 480
@@ -129,15 +132,17 @@ end
 finegrd = 0:0.001:10
 finex = exact(tf, Δt, finegrd, α)
 err = sqrt(Δz) * norm(U[:,end]- E[:,end])
+
+E - U
+
 println(err)
 for i = size(U,2)
-p = plot(U[1:end,i],z[1:end],#=label = string("Numerical",string(Δt)),=# yflip = true, shape = :circle, color = :blue)
-display(p)
-#ylims!((0.0,1.0))
-xlabel!("Temperature (K)")
-ylabel!("Depth (m)")
-pexact = plot!(finex,finegrd, #= label = string("Exact",string(Δt)),=# yflip = true, color = :red)
-display(pexact)
-savefig(string("CPUplot",string(Δz),".png"))
-
+    p = plot(U[1:end,i],z[1:end],#=label = string("Numerical",string(Δt)),=# yflip = true, shape = :circle, color = :blue)
+    display(p)
+    #ylims!((0.0,1.0))
+    xlabel!("Temperature (K)")
+    ylabel!("Depth (m)")
+    pexact = plot!(finex,finegrd, #= label = string("Exact",string(Δt)),=# yflip = true, color = :red)
+    display(pexact)
+    savefig(string("CPUplot",string(Δz),".png"))
 end

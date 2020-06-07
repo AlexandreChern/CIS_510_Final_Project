@@ -1,7 +1,29 @@
 using LinearAlgebra
-#using CUDAnative
-#using CUDAdrv
-#using CuArrays
+using CUDAnative
+using CUDAdrv
+using CuArrays
+
+function knl_gemv!(A,x,b,y)
+    (M,N) = size(A)
+    len = length(A)
+    @assert M == N;
+    bid = blockIdx().x
+    tid = threadIdx().x
+    dim = blockDim().x
+
+    y .= 0
+
+    i = dim * (bid - 1) + tid
+
+    if i <= M
+        for k=1:N
+            y[i] += A[i,k]*x[k]
+        end
+        y[i] += b[i]
+    end
+
+    return nothing
+end
 
 function my_forward_Euler(x, Δt, t1, tf, A, y1, N, M, exact, surf_bc, α, β)
 
@@ -72,6 +94,68 @@ function naive_rk4(z, Δt, t1, tf, u, A, α, β, exact, bound_cond)
 
 
 end
+
+function cu_naive_rk4(z, Δt, t1, tf, u, A, α, β, exact, bound_cond, num_th_blk, num_block)
+
+    all_t = t1:Δt:tf
+    t = t1
+    N = length(u)
+    M = Integer(ceil((tf - t1)/Δt))
+
+    Exact = Matrix{Float64}(zeros(N,M+1))
+    U = Matrix{Float64}(zeros(N,M+1))
+    Exact[:,1] = u[:]
+    U[:,1] = u[:]
+
+    hy = zeros(N)
+    hy1 = zeros(N)
+    hy2 = zeros(N)
+    hy3 = zeros(N)
+    dA = CuArray(A)
+    d_zero = CuArray(zeros(N))
+
+
+    k = Matrix{Float64}(zeros(N,4))
+
+        for n = 2:M+1
+
+            t = t + Δt
+            du = CuArray(u)
+            dy = CuArray(hy)
+            dy1 = CuArray(hy1)
+            dy2 = CuArray(hy2)
+            dy3 = CuArray(hy3)
+
+            @cuda threads = num_th_blk blocks = num_block knl_gemv!(dA,du,d_zero,dy)
+            k[:,1] = dy
+
+            u1_t_half = Δt/2 * k[:,1] + u[:]
+            du_half = CuArray(u1_t_half)
+            @cuda threads = num_th_blk blocks = num_block knl_gemv!(dA,du_half,dy,dy1)
+            k[:,2] = dy1
+
+            u2_t_half = Δt/2 * k[:,2] + u[:]
+            du2_half = CuArray(u2_t_half)
+            @cuda threads = num_th_blk blocks = num_block knl_gemv!(dA,du2_half,dy,dy2)
+            k[:,3] = dy2
+
+            u3 = Δt * k[:,3] + u[:]
+            du3 = CuArray(u3)
+            @cuda threads = num_th_blk blocks = num_block knl_gemv!(dA,du3,dy,dy3)
+            k[:,4] = dy3
+
+            u[:] = u[:] + Δt/6 * (k[:,1] + 2*k[:,2] + 2*k[:,3] + k[:,4])
+            U[:,n] = u[:]
+
+            Exact[:,n] = exact(t,Δt,z,α)
+        end
+
+            return (all_t, U, Exact)
+
+
+end
+
+
 #=
 function cu_naive_rk4(Δt, t1, tf, u, A, exact, num_th_blk, num_block)
 
