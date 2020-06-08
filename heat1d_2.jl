@@ -210,7 +210,7 @@ let
         diff = Array(cu_U[:,end] - cu_U[:,end]);
         @show diff[div(end,10):9*div(end,10)]
         @show norm(diff[div(end,3):2*div(end,3)])
-        # (z, t, U, E) = time_dependent_heat(k, Δz, Δt, tf ,t1, α, β, init_cond, exact, surf_bc, naive_rk4, num_th_blk, num_block)
+        (z, t, U, E) = time_dependent_heat(k, Δz, Δt, tf ,t1, α, β, init_cond, exact, surf_bc, naive_rk4, num_th_blk, num_block)
         # @show U[:,end] - E[:,end]
 
         @time  solve_GPU(k,Δz,Δt,t1,tf,α,β,exact, init_cond, surf_bc, num_th_blk, num_block)
