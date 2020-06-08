@@ -117,8 +117,8 @@ function cu_naive_rk4(z, Δt, t1, tf, u, A, α, β, exact, bound_cond, num_th_bl
     # hy1 = zeros(N)
     # hy2 = zeros(N)
     # hy3 = zeros(N)
-    dA = CuArray(A)
-    d_zero = CuArray(zeros(N))
+    dA = CuArray{Float64}(A)
+    d_zero = CuArray{Float64}(zeros(N))
 
 
     # k = Matrix{Float64}(zeros(N,4))

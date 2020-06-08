@@ -170,7 +170,8 @@ function solve_GPU(k,Δz,Δt,t1,tf,α,β,exact,init_cond, bound_cond, num_th_blo
     # A = (α/Δz^2)*(-2 * sparse(1:N+1,1:N+1,ones(N+1),N+1,N+1) + sparse(2:N+1,1:N,ones(N),N+1,N+1) + sparse(1:N,2:N+1,ones(N),N+1,N+1))
 
     # u = Array{Float64}(spzeros(N+1)) # All Nodes
-    u = randn(N+1)
+    # u = randn(N+1)
+    u = Array{Float64}(undef,N+1)
     u .= exact(0,Δt,z[1:N+1],α)
 
     #println(u)
@@ -190,7 +191,7 @@ let
     Δz_list = [1,0.5,0.25,0.125,0.0625,0.03125, 0.015625]
     Δz_listt = [1,0.5]
     Δz_listtt = [0.25,0.125,0.0625, 0.03125, 0.015625]
-    for Δz in Δz_listtt
+    for Δz in Δz_list
         @show Δz
         λ = 0.1
         Δt = round(λ*Δz^2, digits = 12)
@@ -205,8 +206,8 @@ let
         β = init_cond(10) #boundary condition
         N  = Integer(ceil((10-0)/Δz))
 
-        num_th_blk = 512
-        num_block = cld(N, num_th_blk) + 1
+        num_th_blk = 128
+        num_block = cld(N, num_th_blk)
         @show (num_th_blk, num_block)
 
         (all_t, cu_U) = solve_GPU(k,Δz,Δt,t1,tf,α,β,exact, init_cond, surf_bc, num_th_blk, num_block)
