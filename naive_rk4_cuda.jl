@@ -108,15 +108,16 @@ function cu_naive_rk4(z, Δt, t1, tf, u, A, α, β, exact, bound_cond, num_th_bl
     Exact[:,1] = u[:]
     # U[:,1] = u[:]
     d_U = CuArray{Float64}(zeros(N,M+1))
-    d_U[:,1] = u[:]
     du = CuArray{Float64}(u)
+    d_U[:,1] .= du[:]
+
 
     # hy = zeros(N)
     # hy1 = zeros(N)
     # hy2 = zeros(N)
     # hy3 = zeros(N)
     dA = CuArray(A)
-    d_zero = CuArray(spzeros(N))
+    d_zero = CuArray(zeros(N))
 
 
     # k = Matrix{Float64}(zeros(N,4))
@@ -127,10 +128,13 @@ function cu_naive_rk4(z, Δt, t1, tf, u, A, α, β, exact, bound_cond, num_th_bl
     # dy2 = CuArray(spzeros(N))
     # dy3 = CuArray(spzeros(N))
 
-    dy = CuArray(zeros(N))
-    dy1 = CuArray(zeros(N))
-    dy2 = CuArray(zeros(N))
-    dy3 = CuArray(zeros(N))
+    dy = similar(d_zero)
+    # dy1 = CuArray(zeros(N))
+    # dy2 = CuArray(zeros(N))
+    # dy3 = CuArray(zeros(N))
+    dy1 = similar(dy)
+    dy2 = similar(dy)
+    dy3 = similar(dy)
 
     u1_t_half = similar(dy)
     u2_t_half = similar(dy)
