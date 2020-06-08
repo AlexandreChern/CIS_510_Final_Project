@@ -1,6 +1,8 @@
 using SparseArrays
 using Plots
+using BenchmarkTools
 include("naive_rk4_cuda.jl")
+
 
 # u_t = α u_zz on 0 ≤ z ≤ depth_final
 # u(x,0) = f(z)
@@ -89,67 +91,68 @@ end
 Δz_list = [2, 1, 0.5, 0.25, 0.125]
 Δz_listt = [2,1,0.5,0.25]
 
-for Δz in Δz_listt
-    k = 2.7
-    Cp = 790
-    ρ = 2700
-    # Δz = 1
-    @show Δz
-    λ = 0.1
-    Δt = round(λ*Δz^2, digits = 12)
-    @show Δt
-    #@assert 1 >= 2 * (k*Δt)/(Δx^2)
-    tf = 480
-    t1 = 0
-    α = k/(ρ*Cp) #Thermal Diffusivity
-    #α =
-    #β =
-    β = init_cond(10) #boundary condition
-    N  = Integer(ceil((10-0)/Δz))
+function convergence_test()
+    for Δz in Δz_listt
+        k = 2.7
+        Cp = 790
+        ρ = 2700
+        # Δz = 1
+        @show Δz
+        λ = 0.1
+        Δt = round(λ*Δz^2, digits = 12)
+        @show Δt
+        #@assert 1 >= 2 * (k*Δt)/(Δx^2)
+        tf = 480
+        t1 = 0
+        α = k/(ρ*Cp) #Thermal Diffusivity
+        #α =
+        #β =
+        β = init_cond(10) #boundary condition
+        N  = Integer(ceil((10-0)/Δz))
 
-    num_th_blk = 32
-    num_block = cld(N, num_th_blk)
+        num_th_blk = 32
+        num_block = cld(N, num_th_blk)
 
-    #(x, t, U, E) = time_dependent_heat(k, Δx, Δt, tf ,t1, α, β, f, exact, naive_rk4)
-    (z, t, U, E) = time_dependent_heat(k, Δz, Δt, tf ,t1, α, β, init_cond, exact, surf_bc, naive_rk4, num_th_blk, num_block)
+        #(x, t, U, E) = time_dependent_heat(k, Δx, Δt, tf ,t1, α, β, f, exact, naive_rk4)
+        (z, t, U, E) = time_dependent_heat(k, Δz, Δt, tf ,t1, α, β, init_cond, exact, surf_bc, naive_rk4, num_th_blk, num_block)
 
-    #=
-    xfine = 0:Δx/20:1
+        #=
+        xfine = 0:Δx/20:1
 
-    stride_time = 100
+        stride_time = 100
 
-    for i = 1:1:10
+        for i = 1:1:10
 
-        p = plot(x,U[:,i],label = "approx", shape = :circle, color = :blue)
-        ylims!((0,1))
-        display(p)
+            p = plot(x,U[:,i],label = "approx", shape = :circle, color = :blue)
+            ylims!((0,1))
+            display(p)
 
-        Efine = exact(xfine, t[i])
-        pexact = plot!(xfine,Efine, label = "exact", color = :red)
-        display(pexact)
+            Efine = exact(xfine, t[i])
+            pexact = plot!(xfine,Efine, label = "exact", color = :red)
+            display(pexact)
 
-        sleep(1)
+            sleep(1)
+        end
+
+        =#
+
+        @show err = sqrt(Δz) * norm(U[:,end]- E[:,end])
+        @show (U[10:end,end] - E[10:end,end])
+        @show rel_err = norm(U[:,end] - E[:,end])/norm(E[:,end])
+        println(err)
+        for i = size(U,2)
+            p = plot(U[1:end,i],z[1:end],#=label = string("Numerical",string(Δt)),=# yflip = true, shape = :circle, color = :blue)
+            #ylims!((0.0,1.0))
+            xlabel!("Temperature (K)")
+            ylabel!("Depth (m)")
+            pexact = plot!(E[1:end,i],z[1:end], #= label = string("Exact",string(Δt)),=# yflip = true, color = :red)
+            savefig(string("CPUplot",string(Δz),".png"))
+        end
     end
-
-    =#
-
-    @show err = sqrt(Δz) * norm(U[:,end]- E[:,end])
-    @show (U[10:end,end] - E[10:end,end])
-    @show rel_err = norm(U[:,end] - E[:,end])/norm(E[:,end])
-    println(err)
-    for i = size(U,2)
-    p = plot(U[1:end,i],z[1:end],#=label = string("Numerical",string(Δt)),=# yflip = true, shape = :circle, color = :blue)
-    #ylims!((0.0,1.0))
-    xlabel!("Temperature (K)")
-    ylabel!("Depth (m)")
-    pexact = plot!(E[1:end,i],z[1:end], #= label = string("Exact",string(Δt)),=# yflip = true, color = :red)
-    savefig(string("CPUplot",string(Δz),".png"))
-end
-
 end
 
 
-function solve_GPU(k,Δz,Δt,t1,tf,α,β,init_cond,exact,num_th_block,num_block)
+function solve_GPU(k,Δz,Δt,t1,tf,α,β,exact,init_cond, bound_cond, num_th_block,num_block)
     N  = Integer(ceil((10-0)/Δz)) # N+1 total nodes, N-1 interior nodes
     z = 0:Δz:10
     t = 0:Δt:tf
@@ -166,16 +169,16 @@ function solve_GPU(k,Δz,Δt,t1,tf,α,β,init_cond,exact,num_th_block,num_block)
     #println(A)
     # A = (α/Δz^2)*(-2 * sparse(1:N+1,1:N+1,ones(N+1),N+1,N+1) + sparse(2:N+1,1:N,ones(N),N+1,N+1) + sparse(1:N,2:N+1,ones(N),N+1,N+1))
 
-    u = Array{Float64}(zeros(N+1)) # Interior Nodes
+    u = Array{Float64}(zeros(N+1)) # All Nodes
     u .= exact(0,Δt,z[1:N+1],α)
 
     #println(u)
 
     #(t, U_inter, E_inter) = odesolve(Δt, t1, tf, u, A, my_exact)
-    num_th_block = 32
-    num_block = cld(N, num_th_blk)
-    (all_t, U, E) = cu_naive_rk4(z,Δt, t1, tf, u, A, α, β, exact, init_cond, num_th_block, num_block)
-    return (all_t, U, E)
+    # num_th_block = 32
+    # num_block = cld(N, num_th_blk)
+    (all_t, cu_U, cu_E) = cu_naive_rk4(z,Δt, t1, tf, u, A, α, β, exact, bound_cond, num_th_block, num_block)
+    return (all_t, cu_U, cu_E)
 end
 
 
@@ -183,7 +186,7 @@ let
     k = 2.7
     Cp = 790
     ρ = 2700
-    Δz = 2
+    Δz = 0.5
     @show Δz
     λ = 0.1
     Δt = round(λ*Δz^2, digits = 12)
@@ -199,10 +202,14 @@ let
 
     num_th_blk = 32
     num_block = cld(N, num_th_blk)
+    @show (num_th_blk, num_block)
 
+    # (all_t, cu_U, cu_E) = solve_GPU(k,Δz,Δt,t1,tf,α,β,exact, init_cond, surf_bc, num_th_blk, num_block)
+    # @show cu_U[:,end] - cu_E[:,end]
+    # (z, t, U, E) = time_dependent_heat(k, Δz, Δt, tf ,t1, α, β, init_cond, exact, surf_bc, naive_rk4, num_th_blk, num_block)
+    # @show U[:,end] - E[:,end]
 
-    (all_t, cu_U, cu_E) = solve_GPU(k,Δz,Δt,t1,tf,α,β,init_cond,exact, num_th_blk, num_block)
-    @show cu_U[:,end] - cu_E[:,end]
-    (z, t, U, E) = time_dependent_heat(k, Δz, Δt, tf ,t1, α, β, init_cond, exact, surf_bc, naive_rk4, num_th_blk, num_block)
-    @show U[:,end] - E[:,end]
+    @time  solve_GPU(k,Δz,Δt,t1,tf,α,β,exact, init_cond, surf_bc, num_th_blk, num_block)
+    @time time_dependent_heat(k, Δz, Δt, tf ,t1, α, β, init_cond, exact, surf_bc, naive_rk4, num_th_blk, num_block)
+
 end

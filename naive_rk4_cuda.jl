@@ -66,15 +66,15 @@ function naive_rk4(z, Δt, t1, tf, u, A, α, β, exact, bound_cond)
         for n = 2:M+1
             t = t + Δt
             u[1] = bound_cond(t, Δt)
-            u[end]=β
+            u[end] = β
             uk = u
             k[:,1] = A * u[:]
             uk[1] = bound_cond(t+Δt/2, Δt)
-            uk[end]=β
+            uk[end] = β
             u1_t_half = Δt/2 * k[:,1]
             k[:,2] = k[:,1] + A * u1_t_half
             uk[1] = bound_cond(t+Δt, Δt)
-            uk[end]=β
+            uk[end] = β
             u2_t_half = Δt/2 * k[:,2]
             k[:,3] = k[:,1] + A * u2_t_half
             uk[1] = bound_cond(t+2*Δt, Δt)
@@ -96,6 +96,120 @@ function naive_rk4(z, Δt, t1, tf, u, A, α, β, exact, bound_cond)
 end
 
 function cu_naive_rk4(z, Δt, t1, tf, u, A, α, β, exact, bound_cond, num_th_blk, num_block)
+
+    all_t = t1:Δt:tf
+    t = t1
+    N = length(u)
+    M = Integer(ceil((tf - t1)/Δt))
+
+    Exact = Matrix{Float64}(zeros(N,M+1))
+    # U = Matrix{Float64}(zeros(N,M+1))
+    # U = zeros(N,M+1)
+    Exact[:,1] = u[:]
+    # U[:,1] = u[:]
+    d_U = CuArray{Float64}(zeros(N,M+1))
+    d_U[:,1] = u[:]
+    du = CuArray{Float64}(u)
+
+    # hy = zeros(N)
+    # hy1 = zeros(N)
+    # hy2 = zeros(N)
+    # hy3 = zeros(N)
+    dA = CuArray(A)
+    d_zero = CuArray(spzeros(N))
+
+
+    # k = Matrix{Float64}(zeros(N,4))
+    d_k = CuArray{Float64}(zeros(N,4))
+
+    dy = CuArray(spzeros(N))
+    dy1 = CuArray(spzeros(N))
+    dy2 = CuArray(spzeros(N))
+    dy3 = CuArray(spzeros(N))
+
+    u1_t_half = similar(dy)
+    u2_t_half = similar(dy)
+    u3 = similar(dy)
+
+    for n = 2:M+1
+
+        t = t + Δt
+        # du = CuArray(u)
+        # dy = CuArray(hy)
+        # dy1 = CuArray(hy1)
+        # dy2 = CuArray(hy2)
+        # dy3 = CuArray(hy3)
+
+        @cuda threads = num_th_blk blocks = num_block knl_gemv!(dA,du,d_zero,dy)
+        # d_k[:,1] = dy
+
+        # u1_t_half = Δt/2 * d_k[:,1] + du[:]
+        u1_t_half = Δt/2 * dy + du[:]
+        # du_half = CuArray(u1_t_half)
+        # @cuda threads = num_th_blk blocks = num_block knl_gemv!(dA,du_half,dy,dy1)
+        @cuda threads = num_th_blk blocks = num_block knl_gemv!(dA,u1_t_half,dy,dy1)
+        # d_k[:,2] = dy1
+
+        # u2_t_half = Δt/2 * d_k[:,2] + du[:]
+        u2_t_half = Δt/2 * dy1 + du[:]
+        # du2_half = CuArray(u2_t_half)
+        # @cuda threads = num_th_blk blocks = num_block knl_gemv!(dA,du2_half,dy,dy2)
+        @cuda threads = num_th_blk blocks = num_block knl_gemv!(dA,u2_t_half,dy,dy2)
+        # d_k[:,3] = dy2
+
+        # u3 = Δt * d_k[:,3] + du[:]
+        u3 = Δt * dy2 + du[:]
+        # du3 = CuArray(u3)
+        # @cuda threads = num_th_blk blocks = num_block knl_gemv!(dA,du3,dy,dy3)
+        @cuda threads = num_th_blk blocks = num_block knl_gemv!(dA,u3,dy,dy3)
+        # d_k[:,4] = dy3
+
+        # du[:] = du[:] + Δt/6 * (d_k[:,1] + 2*d_k[:,2] + 2*d_k[:,3] + d_k[:,4])
+        # u = Array(du)
+        # u = Array(du[:] + Δt/6 * (d_k[:,1] + 2*d_k[:,2] + 2*d_k[:,3] + d_k[:,4]))
+        # u = Array(du[:] + Δt/6 * (dy + 2*dy1 + 2*dy2 + dy3))
+        u = du[:] + Δt/6 * (dy + 2*dy1 + 2*dy2 + dy3)
+        # @show typeof(u)
+        u[1] = bound_cond(t, Δt)
+        u[end]=β
+        d_U[:,n] = u[:]
+
+        Exact[:,n] = exact(t,Δt,z,α)
+    end
+
+    return (all_t, d_U, Exact)
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+######################################### OLD CODE ##############################
+
+
+
+
+
+
+
+
+
+
+
+
+function cu_naive_rk4_old(z, Δt, t1, tf, u, A, α, β, exact, bound_cond, num_th_blk, num_block)
 
     all_t = t1:Δt:tf
     t = t1
@@ -127,17 +241,17 @@ function cu_naive_rk4(z, Δt, t1, tf, u, A, α, β, exact, bound_cond, num_th_bl
             dy3 = CuArray(hy3)
 
             @cuda threads = num_th_blk blocks = num_block knl_gemv!(dA,du,d_zero,dy)
-            k[:,1] = dy
+            k[:,1] .= dy
 
             u1_t_half = Δt/2 * k[:,1] + u[:]
             du_half = CuArray(u1_t_half)
             @cuda threads = num_th_blk blocks = num_block knl_gemv!(dA,du_half,dy,dy1)
-            k[:,2] = dy1
+            k[:,2] .= dy1
 
             u2_t_half = Δt/2 * k[:,2] + u[:]
             du2_half = CuArray(u2_t_half)
             @cuda threads = num_th_blk blocks = num_block knl_gemv!(dA,du2_half,dy,dy2)
-            k[:,3] = dy2
+            k[:,3] .= dy2
 
             u3 = Δt * k[:,3] + u[:]
             du3 = CuArray(u3)
@@ -145,6 +259,9 @@ function cu_naive_rk4(z, Δt, t1, tf, u, A, α, β, exact, bound_cond, num_th_bl
             k[:,4] = dy3
 
             u[:] = u[:] + Δt/6 * (k[:,1] + 2*k[:,2] + 2*k[:,3] + k[:,4])
+            @show typeof(u)
+            u[1] = bound_cond(t, Δt)
+            u[end]=β
             U[:,n] = u[:]
 
             Exact[:,n] = exact(t,Δt,z,α)
@@ -154,7 +271,6 @@ function cu_naive_rk4(z, Δt, t1, tf, u, A, α, β, exact, bound_cond, num_th_bl
 
 
 end
-
 
 #=
 function cu_naive_rk4(Δt, t1, tf, u, A, exact, num_th_blk, num_block)
