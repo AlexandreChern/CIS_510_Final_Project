@@ -186,30 +186,36 @@ let
     k = 2.7
     Cp = 790
     ρ = 2700
-    Δz = 0.5
-    @show Δz
-    λ = 0.1
-    Δt = round(λ*Δz^2, digits = 12)
-    @show Δt
-    #@assert 1 >= 2 * (k*Δt)/(Δx^2)
-    tf = 480
-    t1 = 0
-    α = k/(ρ*Cp) #Thermal Diffusivity
-    #α =
-    #β =
-    β = init_cond(10) #boundary condition
-    N  = Integer(ceil((10-0)/Δz))
+    Δz_list = [1,0.5,0.25,0.125]
+    for Δz in Δz_list
+        @show Δz
+        λ = 0.1
+        Δt = round(λ*Δz^2, digits = 12)
+        @show Δt
+        #@assert 1 >= 2 * (k*Δt)/(Δx^2)
+        tf = 480
+        t1 = 0
+        α = k/(ρ*Cp) #Thermal Diffusivity
+        #α =
+        #β =
+        β = init_cond(10) #boundary condition
+        N  = Integer(ceil((10-0)/Δz))
 
-    num_th_blk = 32
-    num_block = cld(N, num_th_blk)
-    @show (num_th_blk, num_block)
+        num_th_blk = 32
+        num_block = cld(N, num_th_blk)
+        @show (num_th_blk, num_block)
 
-    (all_t, cu_U, cu_E) = solve_GPU(k,Δz,Δt,t1,tf,α,β,exact, init_cond, surf_bc, num_th_blk, num_block)
-    @show Array(cu_U[:,end]) - cu_E[:,end]
-    # (z, t, U, E) = time_dependent_heat(k, Δz, Δt, tf ,t1, α, β, init_cond, exact, surf_bc, naive_rk4, num_th_blk, num_block)
-    # @show U[:,end] - E[:,end]
+        (all_t, cu_U, cu_E) = solve_GPU(k,Δz,Δt,t1,tf,α,β,exact, init_cond, surf_bc, num_th_blk, num_block)
+        # @show Array(cu_U[:,end]) - cu_E[:,end]
+        diff = Array(cu_U[:,end] - cu_U[:,end]);
+        @show diff[div(end,10):9*div(end,10)]
+        @show norm(diff[div(end,3):2*div(end,3)])
+        # (z, t, U, E) = time_dependent_heat(k, Δz, Δt, tf ,t1, α, β, init_cond, exact, surf_bc, naive_rk4, num_th_blk, num_block)
+        # @show U[:,end] - E[:,end]
 
-    @time  solve_GPU(k,Δz,Δt,t1,tf,α,β,exact, init_cond, surf_bc, num_th_blk, num_block)
-    @time time_dependent_heat(k, Δz, Δt, tf ,t1, α, β, init_cond, exact, surf_bc, naive_rk4, num_th_blk, num_block)
-
+        @time  solve_GPU(k,Δz,Δt,t1,tf,α,β,exact, init_cond, surf_bc, num_th_blk, num_block)
+        @time time_dependent_heat(k, Δz, Δt, tf ,t1, α, β, init_cond, exact, surf_bc, naive_rk4, num_th_blk, num_block)
+        println()
+        println()
+    end
 end
