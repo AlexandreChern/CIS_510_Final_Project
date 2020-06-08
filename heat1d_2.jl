@@ -188,6 +188,7 @@ let
     ρ = 2700
     Δz_list = [1,0.5,0.25,0.125,0.0625,0.03125, 0.015625]
     Δz_listt = [1,0.5]
+    Δz_listtt = [1,0.5,0.25,0.125,0.0625, 0.03125]
     for Δz in Δz_list
         @show Δz
         λ = 0.1
@@ -204,14 +205,17 @@ let
         N  = Integer(ceil((10-0)/Δz))
 
         num_th_blk = 128
-        num_block = cld(N, num_th_blk)
+        num_block = cld(N, num_th_blk) + 1
         @show (num_th_blk, num_block)
 
         (all_t, cu_U, cu_E) = solve_GPU(k,Δz,Δt,t1,tf,α,β,exact, init_cond, surf_bc, num_th_blk, num_block)
         # @show Array(cu_U[:,end]) - cu_E[:,end]
-        diff = Array(cu_U[:,end] - cu_U[:,end]);
-        @show diff[div(end,10):9*div(end,10)]
-        @show norm(diff[div(end,3):2*div(end,3)])
+        diff = Array(cu_U[:,end]) - cu_E[:,end];|
+        @show diff[2]
+        @show diff[div(end,2)]
+
+        # @show diff[div(end,10):9*div(end,10)]
+        @show norm(diff[div(end,10):9*div(end,10)])
         (z, t, U, E) = time_dependent_heat(k, Δz, Δt, tf ,t1, α, β, init_cond, exact, surf_bc, naive_rk4, num_th_blk, num_block)
         # @show U[:,end] - E[:,end]
 
