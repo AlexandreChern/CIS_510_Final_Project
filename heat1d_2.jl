@@ -188,13 +188,13 @@ let
     ρ = 2700
     Δz_list = [1,0.5,0.25,0.125,0.0625,0.03125, 0.015625]
     Δz_listt = [1,0.5]
-    for Δz in Δz_listt
+    for Δz in Δz_list
         @show Δz
         λ = 0.1
         Δt = round(λ*Δz^2, digits = 12)
         @show Δt
         #@assert 1 >= 2 * (k*Δt)/(Δx^2)
-        tf = 480
+        tf = 1
         # tf = 1
         t1 = 0
         α = k/(ρ*Cp) #Thermal Diffusivity
@@ -203,7 +203,7 @@ let
         β = init_cond(10) #boundary condition
         N  = Integer(ceil((10-0)/Δz))
 
-        num_th_blk = 32
+        num_th_blk = 128
         num_block = cld(N, num_th_blk)
         @show (num_th_blk, num_block)
 
