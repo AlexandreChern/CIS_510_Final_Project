@@ -178,8 +178,8 @@ function solve_GPU(k,Δz,Δt,t1,tf,α,β,exact,init_cond, bound_cond, num_th_blo
     #(t, U_inter, E_inter) = odesolve(Δt, t1, tf, u, A, my_exact)
     # num_th_block = 32
     # num_block = cld(N, num_th_blk)
-    (all_t, cu_U, cu_E) = cu_naive_rk4(z,Δt, t1, tf, u, A, α, β, exact, bound_cond, num_th_block, num_block)
-    return (all_t, cu_U, cu_E)
+    (all_t, cu_U) = cu_naive_rk4(z,Δt, t1, tf, u, A, α, β, exact, bound_cond, num_th_block, num_block)
+    return (all_t, cu_U)
 end
 
 
@@ -205,18 +205,18 @@ let
         β = init_cond(10) #boundary condition
         N  = Integer(ceil((10-0)/Δz))
 
-        num_th_blk = 128
+        num_th_blk = 512
         num_block = cld(N, num_th_blk) + 1
         @show (num_th_blk, num_block)
 
-        (all_t, cu_U, cu_E) = solve_GPU(k,Δz,Δt,t1,tf,α,β,exact, init_cond, surf_bc, num_th_blk, num_block)
+        (all_t, cu_U) = solve_GPU(k,Δz,Δt,t1,tf,α,β,exact, init_cond, surf_bc, num_th_blk, num_block)
         # @show Array(cu_U[:,end]) - cu_E[:,end]
-        diff = Array(cu_U[:,end]) - cu_E[:,end];|
-        @show diff[2]
-        @show diff[div(end,2)]
+        # diff = Array(cu_U[:,end]) - cu_E[:,end];|
+        # @show diff[2]
+        # @show diff[div(end,2)]
 
         # @show diff[div(end,10):9*div(end,10)]
-        @show norm(diff[div(end,10):9*div(end,10)])
+        # @show norm(diff[div(end,10):9*div(end,10)])
         (z, t, U, E) = time_dependent_heat(k, Δz, Δt, tf ,t1, α, β, init_cond, exact, surf_bc, naive_rk4, num_th_blk, num_block)
         # @show U[:,end] - E[:,end]
 

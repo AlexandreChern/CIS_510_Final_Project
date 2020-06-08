@@ -102,14 +102,15 @@ function cu_naive_rk4(z, Δt, t1, tf, u, A, α, β, exact, bound_cond, num_th_bl
     N = length(u)
     M = Integer(ceil((tf - t1)/Δt))
 
-    Exact = Matrix{Float64}(zeros(N,M+1))
-    # U = Matrix{Float64}(zeros(N,M+1))
-    # U = zeros(N,M+1)
-    Exact[:,1] = u[:]
+    # Exact = Matrix{Float64}(zeros(N,M+1))
+    # # U = Matrix{Float64}(zeros(N,M+1))
+    # # U = zeros(N,M+1)
+    # Exact[:,1] .= u[:]
     # U[:,1] = u[:]
     d_U = CuArray{Float64}(zeros(N,M+1))
     du = CuArray{Float64}(u)
-    d_U[:,1] .= du[:]
+    # d_U[:,1] .= du[:]
+    d_U[:,1] .= du
 
 
     # hy = zeros(N)
@@ -152,21 +153,24 @@ function cu_naive_rk4(z, Δt, t1, tf, u, A, α, β, exact, bound_cond, num_th_bl
         # d_k[:,1] = dy
 
         # u1_t_half = Δt/2 * d_k[:,1] + du[:]
-        u1_t_half .= Δt/2 * dy .+ du[:]
+        # u1_t_half .= Δt/2 .* dy .+ du[:]
+        u1_t_half .= Δt/2 .* dy .+ du
         # du_half = CuArray(u1_t_half)
         # @cuda threads = num_th_blk blocks = num_block knl_gemv!(dA,du_half,dy,dy1)
         @cuda threads = num_th_blk blocks = num_block knl_gemv!(dA,u1_t_half,dy,dy1)
         # d_k[:,2] = dy1
 
         # u2_t_half = Δt/2 * d_k[:,2] + du[:]
-        u2_t_half .= Δt/2 * dy1 .+ du[:]
+        # u2_t_half .= Δt/2 .* dy1 .+ du[:]
+        u2_t_half .= Δt/2 .* dy1 .+ du
         # du2_half = CuArray(u2_t_half)
         # @cuda threads = num_th_blk blocks = num_block knl_gemv!(dA,du2_half,dy,dy2)
         @cuda threads = num_th_blk blocks = num_block knl_gemv!(dA,u2_t_half,dy,dy2)
         # d_k[:,3] = dy2
 
         # u3 = Δt * d_k[:,3] + du[:]
-        u3 .= Δt * dy2 .+ du[:]
+        # u3 .= Δt .* dy2 .+ du[:]
+        u3 .= Δt .* dy2 .+ du
         # du3 = CuArray(u3)
         # @cuda threads = num_th_blk blocks = num_block knl_gemv!(dA,du3,dy,dy3)
         @cuda threads = num_th_blk blocks = num_block knl_gemv!(dA,u3,dy,dy3)
@@ -180,16 +184,18 @@ function cu_naive_rk4(z, Δt, t1, tf, u, A, α, β, exact, bound_cond, num_th_bl
         # @show typeof(u)
         # u[1] = bound_cond(t, Δt)
         # u[end]=β
-        d_U[:,n] .= du[:] .+ Δt/6 * (dy .+ 2*dy1 .+ 2*dy2 .+ dy3)
+        # d_U[:,n] .= du[:] .+ Δt/6 .* (dy .+ 2*dy1 .+ 2*dy2 .+ dy3)
+        d_U[:,n] .= du .+ Δt/6 .* (dy .+ 2*dy1 .+ 2*dy2 .+ dy3)
         # d_U[1,n] = bound_cond(t, Δt)
         # d_U[end,n] = β
         # d_U[:,n] = u[:]
 
-        Exact[:,n] = exact(t,Δt,z,α)
+        # Exact[:,n] = exact(t,Δt,z,α)
     end
     d_U[end,:] .= β
     d_U[1,:] = surf_bc.(all_t,Δt)
-    return (all_t, d_U, Exact)
+    # return (all_t, d_U, Exact)
+    return (all_t, d_U)
 end
 
 
