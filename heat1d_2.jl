@@ -204,8 +204,8 @@ let
     num_block = cld(N, num_th_blk)
     @show (num_th_blk, num_block)
 
-    # (all_t, cu_U, cu_E) = solve_GPU(k,Δz,Δt,t1,tf,α,β,exact, init_cond, surf_bc, num_th_blk, num_block)
-    # @show cu_U[:,end] - cu_E[:,end]
+    (all_t, cu_U, cu_E) = solve_GPU(k,Δz,Δt,t1,tf,α,β,exact, init_cond, surf_bc, num_th_blk, num_block)
+    @show Array(cu_U[:,end]) - cu_E[:,end]
     # (z, t, U, E) = time_dependent_heat(k, Δz, Δt, tf ,t1, α, β, init_cond, exact, surf_bc, naive_rk4, num_th_blk, num_block)
     # @show U[:,end] - E[:,end]
 

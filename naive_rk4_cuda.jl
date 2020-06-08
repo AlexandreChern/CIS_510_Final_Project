@@ -120,7 +120,7 @@ function cu_naive_rk4(z, Δt, t1, tf, u, A, α, β, exact, bound_cond, num_th_bl
 
 
     # k = Matrix{Float64}(zeros(N,4))
-    d_k = CuArray{Float64}(zeros(N,4))
+    # d_k = CuArray{Float64}(zeros(N,4))
 
     dy = CuArray(spzeros(N))
     dy1 = CuArray(spzeros(N))
@@ -132,7 +132,6 @@ function cu_naive_rk4(z, Δt, t1, tf, u, A, α, β, exact, bound_cond, num_th_bl
     u3 = similar(dy)
 
     for n = 2:M+1
-
         t = t + Δt
         # du = CuArray(u)
         # dy = CuArray(hy)
@@ -144,21 +143,21 @@ function cu_naive_rk4(z, Δt, t1, tf, u, A, α, β, exact, bound_cond, num_th_bl
         # d_k[:,1] = dy
 
         # u1_t_half = Δt/2 * d_k[:,1] + du[:]
-        u1_t_half = Δt/2 * dy + du[:]
+        u1_t_half .= Δt/2 * dy .+ du[:]
         # du_half = CuArray(u1_t_half)
         # @cuda threads = num_th_blk blocks = num_block knl_gemv!(dA,du_half,dy,dy1)
         @cuda threads = num_th_blk blocks = num_block knl_gemv!(dA,u1_t_half,dy,dy1)
         # d_k[:,2] = dy1
 
         # u2_t_half = Δt/2 * d_k[:,2] + du[:]
-        u2_t_half = Δt/2 * dy1 + du[:]
+        u2_t_half .= Δt/2 * dy1 .+ du[:]
         # du2_half = CuArray(u2_t_half)
         # @cuda threads = num_th_blk blocks = num_block knl_gemv!(dA,du2_half,dy,dy2)
         @cuda threads = num_th_blk blocks = num_block knl_gemv!(dA,u2_t_half,dy,dy2)
         # d_k[:,3] = dy2
 
         # u3 = Δt * d_k[:,3] + du[:]
-        u3 = Δt * dy2 + du[:]
+        u3 .= Δt * dy2 .+ du[:]
         # du3 = CuArray(u3)
         # @cuda threads = num_th_blk blocks = num_block knl_gemv!(dA,du3,dy,dy3)
         @cuda threads = num_th_blk blocks = num_block knl_gemv!(dA,u3,dy,dy3)
@@ -168,22 +167,26 @@ function cu_naive_rk4(z, Δt, t1, tf, u, A, α, β, exact, bound_cond, num_th_bl
         # u = Array(du)
         # u = Array(du[:] + Δt/6 * (d_k[:,1] + 2*d_k[:,2] + 2*d_k[:,3] + d_k[:,4]))
         # u = Array(du[:] + Δt/6 * (dy + 2*dy1 + 2*dy2 + dy3))
-        u = du[:] + Δt/6 * (dy + 2*dy1 + 2*dy2 + dy3)
+        # u = du[:] + Δt/6 * (dy + 2*dy1 + 2*dy2 + dy3)
         # @show typeof(u)
-        u[1] = bound_cond(t, Δt)
-        u[end]=β
-        d_U[:,n] = u[:]
+        # u[1] = bound_cond(t, Δt)
+        # u[end]=β
+        d_U[:,n] .= du[:] + Δt/6 * (dy + 2*dy1 + 2*dy2 + dy3)
+        # d_U[1,n] = bound_cond(t, Δt)
+        # d_U[end,n] = β
+        # d_U[:,n] = u[:]
 
         Exact[:,n] = exact(t,Δt,z,α)
     end
-
+    d_U[end,:] = β
+    d_U[1,:] = surf_bc.(all_t,Δt)
     return (all_t, d_U, Exact)
 end
 
 
 
 
-
+######################################## OLD CODE ####################################
 
 
 
@@ -259,7 +262,7 @@ function cu_naive_rk4_old(z, Δt, t1, tf, u, A, α, β, exact, bound_cond, num_t
             k[:,4] = dy3
 
             u[:] = u[:] + Δt/6 * (k[:,1] + 2*k[:,2] + 2*k[:,3] + k[:,4])
-            @show typeof(u)
+            # @show typeof(u)
             u[1] = bound_cond(t, Δt)
             u[end]=β
             U[:,n] = u[:]
