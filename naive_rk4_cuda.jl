@@ -122,10 +122,15 @@ function cu_naive_rk4(z, Δt, t1, tf, u, A, α, β, exact, bound_cond, num_th_bl
     # k = Matrix{Float64}(zeros(N,4))
     # d_k = CuArray{Float64}(zeros(N,4))
 
-    dy = CuArray(spzeros(N))
-    dy1 = CuArray(spzeros(N))
-    dy2 = CuArray(spzeros(N))
-    dy3 = CuArray(spzeros(N))
+    # dy = CuArray(spzeros(N))
+    # dy1 = CuArray(spzeros(N))
+    # dy2 = CuArray(spzeros(N))
+    # dy3 = CuArray(spzeros(N))
+
+    dy = CuArray(zeros(N))
+    dy1 = CuArray(zeros(N))
+    dy2 = CuArray(zeros(N))
+    dy3 = CuArray(zeros(N))
 
     u1_t_half = similar(dy)
     u2_t_half = similar(dy)
@@ -171,14 +176,14 @@ function cu_naive_rk4(z, Δt, t1, tf, u, A, α, β, exact, bound_cond, num_th_bl
         # @show typeof(u)
         # u[1] = bound_cond(t, Δt)
         # u[end]=β
-        d_U[:,n] .= du[:] + Δt/6 * (dy + 2*dy1 + 2*dy2 + dy3)
+        d_U[:,n] .= du[:] .+ Δt/6 * (dy .+ 2*dy1 .+ 2*dy2 .+ dy3)
         # d_U[1,n] = bound_cond(t, Δt)
         # d_U[end,n] = β
         # d_U[:,n] = u[:]
 
         Exact[:,n] = exact(t,Δt,z,α)
     end
-    d_U[end,:] = β
+    d_U[end,:] .= β
     d_U[1,:] = surf_bc.(all_t,Δt)
     return (all_t, d_U, Exact)
 end

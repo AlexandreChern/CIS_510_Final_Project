@@ -187,13 +187,15 @@ let
     Cp = 790
     ρ = 2700
     Δz_list = [1,0.5,0.25,0.125,0.0625,0.03125, 0.015625]
-    for Δz in Δz_list
+    Δz_listt = [1,0.5]
+    for Δz in Δz_listt
         @show Δz
         λ = 0.1
         Δt = round(λ*Δz^2, digits = 12)
         @show Δt
         #@assert 1 >= 2 * (k*Δt)/(Δx^2)
-        tf = 1
+        tf = 480
+        # tf = 1
         t1 = 0
         α = k/(ρ*Cp) #Thermal Diffusivity
         #α =
