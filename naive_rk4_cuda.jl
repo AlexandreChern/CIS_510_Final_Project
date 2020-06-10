@@ -25,6 +25,27 @@ function knl_gemv!(A,x,b,y)
     return nothing
 end
 
+function knl_gemvs!(A,x,y)
+    (M,N) = size(A)
+    len = length(A)
+    @assert M == N;
+    bid = blockIdx().x
+    tid = threadIdx().x
+    dim = blockDim().x
+
+    y .= 0
+
+    i = dim * (bid - 1) + tid
+
+    if i <= M
+        for k=1:N
+            y[i] += A[i,k]*x[k]
+        end
+    end
+
+    return nothing
+end
+
 function my_forward_Euler(x, Δt, t1, tf, A, y1, N, M, exact, surf_bc, α, β)
 
     l = length(y1)
@@ -107,10 +128,12 @@ function cu_naive_rk4(z, Δt, t1, tf, u, A, α, β, exact, bound_cond, num_th_bl
     # # U = zeros(N,M+1)
     # Exact[:,1] .= u[:]
     # U[:,1] = u[:]
-    d_U = CuArray{Float64}(zeros(N,M+1))
+    # d_U = CuArray{Float64}(zeros(N,M+1))
+    # d_U = CuArray{Float64}(undef,N,M+1)
+    d_U = CuArray{Float64}(U)
     du = CuArray{Float64}(u)
     # d_U[:,1] .= du[:]
-    d_U[:,1] .= du
+    d_U[:,1] = du
 
 
     # hy = zeros(N)
@@ -118,7 +141,7 @@ function cu_naive_rk4(z, Δt, t1, tf, u, A, α, β, exact, bound_cond, num_th_bl
     # hy2 = zeros(N)
     # hy3 = zeros(N)
     dA = CuArray{Float64}(A)
-    d_zero = CuArray{Float64}(zeros(N))
+    # d_zero = CuArray{Float64}(zeros(N))
 
 
     # k = Matrix{Float64}(zeros(N,4))
@@ -129,7 +152,7 @@ function cu_naive_rk4(z, Δt, t1, tf, u, A, α, β, exact, bound_cond, num_th_bl
     # dy2 = CuArray(spzeros(N))
     # dy3 = CuArray(spzeros(N))
 
-    dy = similar(d_zero)
+    dy = CuArray{Float64}(undef,N)
     # dy1 = CuArray(zeros(N))
     # dy2 = CuArray(zeros(N))
     # dy3 = CuArray(zeros(N))
@@ -149,7 +172,8 @@ function cu_naive_rk4(z, Δt, t1, tf, u, A, α, β, exact, bound_cond, num_th_bl
         # dy2 = CuArray(hy2)
         # dy3 = CuArray(hy3)
 
-        @cuda threads = num_th_blk blocks = num_block knl_gemv!(dA,du,d_zero,dy)
+        # @cuda threads = num_th_blk blocks = num_block knl_gemv!(dA,du,d_zero,dy)
+        @cuda threads = num_th_blk blocks = num_block knl_gemvs!(dA,du,dy)
         # d_k[:,1] = dy
 
         # u1_t_half = Δt/2 * d_k[:,1] + du[:]

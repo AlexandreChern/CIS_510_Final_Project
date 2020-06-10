@@ -184,6 +184,73 @@ function solve_GPU(k,Δz,Δt,t1,tf,α,β,exact,init_cond, bound_cond, num_th_blo
 end
 
 
+function solve_GPU_new(k,Δz,Δt,t1,tf,α,β,exact,init_cond, bound_cond, num_th_block,num_block)
+    N  = Integer(ceil((10-0)/Δz)) # N+1 total nodes, N-1 interior nodes
+    z = 0:Δz:10
+    t = 0:Δt:tf
+    M = Integer(ceil((tf-0)/Δt)) # M+1 total temporal nodes
+
+    # A is N+1 by N+1 because it contains boundary points
+
+    A = (α/Δz^2)*(-2 * sparse(1:N+1,1:N+1,ones(N+1),N+1,N+1) + sparse(2:N,1:N-1,ones(N-1),N+1,N+1) +
+        sparse(2:N,3:N+1,ones(N-1),N+1,N+1))
+    A[1,1]=(α/Δz^2)*1
+    A[N+1,N+1]=(α/Δz^2)*1
+    A[2,1]=(α/Δz^2)*1
+    A[N,N+1]=(α/Δz^2)*1
+    #println(A)
+    # A = (α/Δz^2)*(-2 * sparse(1:N+1,1:N+1,ones(N+1),N+1,N+1) + sparse(2:N+1,1:N,ones(N),N+1,N+1) + sparse(1:N,2:N+1,ones(N),N+1,N+1))
+
+    # u = Array{Float64}(spzeros(N+1)) # All Nodes
+    # u = randn(N+1)
+    u = Array{Float64}(undef,N+1)
+    u .= exact(0,Δt,z[1:N+1],α)
+
+    #println(u)
+
+    #(t, U_inter, E_inter) = odesolve(Δt, t1, tf, u, A, my_exact)
+    # num_th_block = 32
+    # num_block = cld(N, num_th_blk)
+    # (all_t, cu_U) = cu_naive_rk4(z,Δt, t1, tf, u, A, α, β, exact, bound_cond, num_th_block, num_block)
+    all_t = t1:Δt:tf
+    t = t1
+    N = length(u)
+    M = Integer(ceil((tf - t1)/Δt))
+
+    d_U = CuArray{Float64}(undef,N+1,M+1)
+    du = CuArray{Float64}(u)
+    d_U[:,1] = du
+
+    dA = CuArray{Float64}(A)
+
+    dy = CuArray{Float64}(undef,N)
+
+    dy1 = similar(dy)
+    dy2 = similar(dy)
+    dy3 = similar(dy)
+
+    u1_t_half = similar(dy)
+    u2_t_half = similar(dy)
+    u3 = similar(dy)
+
+    for n = 2:M+1
+        t = t + Δt
+        @cuda threads = num_th_blk blocks = num_block knl_gemvs!(dA,du,dy)
+        u1_t_half .= Δt/2 .* dy .+ du
+        @cuda threads = num_th_blk blocks = num_block knl_gemv!(dA,u1_t_half,dy,dy1)
+        u2_t_half .= Δt/2 .* dy1 .+ du
+        @cuda threads = num_th_blk blocks = num_block knl_gemv!(dA,u2_t_half,dy,dy2)
+        u3 .= Δt .* dy2 .+ du
+        @cuda threads = num_th_blk blocks = num_block knl_gemv!(dA,u3,dy,dy3)
+        d_U[:,n] .= du .+ Δt/6 .* (dy .+ 2*dy1 .+ 2*dy2 .+ dy3)
+    end
+    d_U[end,:] .= β
+    d_U[1,:] = surf_bc.(all_t,Δt)
+    return (all_t, cu_U)
+end
+
+
+
 let
     k = 2.7
     Cp = 790
@@ -191,7 +258,7 @@ let
     Δz_list = [1,0.5,0.25,0.125,0.0625,0.03125, 0.015625]
     Δz_listt = [1,0.5]
     Δz_listtt = [0.25,0.125,0.0625, 0.03125, 0.015625]
-    for Δz in Δz_list
+    for Δz in Δz_listtt
         @show Δz
         λ = 0.1
         Δt = round(λ*Δz^2, digits = 12)
