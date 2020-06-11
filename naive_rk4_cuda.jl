@@ -125,7 +125,7 @@ function cu_naive_rk4(z, Δt, t1, tf, u, A, α, β, exact, bound_cond, num_th_bl
 
     # Exact = Matrix{Float64}(zeros(N,M+1))
     # # U = Matrix{Float64}(zeros(N,M+1))
-    # # U = zeros(N,M+1)
+    U = zeros(N,M+1)
     # Exact[:,1] .= u[:]
     # U[:,1] = u[:]
     # d_U = CuArray{Float64}(zeros(N,M+1))

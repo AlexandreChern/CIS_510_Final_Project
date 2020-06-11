@@ -73,6 +73,11 @@ function time_dependent_heat(k, Δz, Δt, tf ,t1, α, β, initial, exact, bound_
     #println(u)
 
     #(t, U_inter, E_inter) = odesolve(Δt, t1, tf, u, A, my_exact)
+    t2 = time()
+    for i in 1:10
+    (t, U, E) = odesolve(z, Δt, t1, tf, u, A, α, β, exact, bound_cond)
+    end
+    println("Time to solve on CPU:", (time() - t2)/2)
     (t, U, E) = odesolve(z, Δt, t1, tf, u, A, α, β, exact, bound_cond)
 #=
     init = Array{Float64}(zeros(M+1,2))
@@ -179,7 +184,9 @@ function solve_GPU(k,Δz,Δt,t1,tf,α,β,exact,init_cond, bound_cond, num_th_blo
     #(t, U_inter, E_inter) = odesolve(Δt, t1, tf, u, A, my_exact)
     # num_th_block = 32
     # num_block = cld(N, num_th_blk)
+    t3 = time()
     (all_t, cu_U) = cu_naive_rk4(z,Δt, t1, tf, u, A, α, β, exact, bound_cond, num_th_block, num_block)
+    println("Time to solve this problem on GPU with cu_naive_rk4 function call: ", time() - t3)
     return (all_t, cu_U)
 end
 
@@ -188,16 +195,18 @@ function solve_GPU_new(k,Δz,Δt,t1,tf,α,β,exact,init_cond, bound_cond, num_th
     N  = Integer(ceil((10-0)/Δz)) # N+1 total nodes, N-1 interior nodes
     z = 0:Δz:10
     t = 0:Δt:tf
-    M = Integer(ceil((tf-0)/Δt)) # M+1 total temporal nodes
+    M = Integer(ceil((tf-t1)/Δt)) # M+1 total temporal nodes
 
     # A is N+1 by N+1 because it contains boundary points
 
+    t_ass = time()
     A = (α/Δz^2)*(-2 * sparse(1:N+1,1:N+1,ones(N+1),N+1,N+1) + sparse(2:N,1:N-1,ones(N-1),N+1,N+1) +
         sparse(2:N,3:N+1,ones(N-1),N+1,N+1))
     A[1,1]=(α/Δz^2)*1
     A[N+1,N+1]=(α/Δz^2)*1
     A[2,1]=(α/Δz^2)*1
     A[N,N+1]=(α/Δz^2)*1
+    println("Time to assemble A matrices ", time() - t_ass)
     #println(A)
     # A = (α/Δz^2)*(-2 * sparse(1:N+1,1:N+1,ones(N+1),N+1,N+1) + sparse(2:N+1,1:N,ones(N),N+1,N+1) + sparse(1:N,2:N+1,ones(N),N+1,N+1))
 
@@ -212,18 +221,16 @@ function solve_GPU_new(k,Δz,Δt,t1,tf,α,β,exact,init_cond, bound_cond, num_th
     # num_th_block = 32
     # num_block = cld(N, num_th_blk)
     # (all_t, cu_U) = cu_naive_rk4(z,Δt, t1, tf, u, A, α, β, exact, bound_cond, num_th_block, num_block)
-    all_t = t1:Δt:tf
-    t = t1
-    N = length(u)
-    M = Integer(ceil((tf - t1)/Δt))
 
     d_U = CuArray{Float64}(undef,N+1,M+1)
     du = CuArray{Float64}(u)
-    d_U[:,1] = du
+    d_U[:,1] .= du
 
+    t_s = time()
     dA = CuArray{Float64}(A)
+    println("Time to convert A into CUDA array: ", time() - t_s)
 
-    dy = CuArray{Float64}(undef,N)
+    dy = CuArray{Float64}(undef,N+1)
 
     dy1 = similar(dy)
     dy2 = similar(dy)
@@ -233,8 +240,9 @@ function solve_GPU_new(k,Δz,Δt,t1,tf,α,β,exact,init_cond, bound_cond, num_th
     u2_t_half = similar(dy)
     u3 = similar(dy)
 
+    t_start = time()
     for n = 2:M+1
-        t = t + Δt
+        # t = t + Δt
         @cuda threads = num_th_blk blocks = num_block knl_gemvs!(dA,du,dy)
         u1_t_half .= Δt/2 .* dy .+ du
         @cuda threads = num_th_blk blocks = num_block knl_gemv!(dA,u1_t_half,dy,dy1)
@@ -244,9 +252,10 @@ function solve_GPU_new(k,Δz,Δt,t1,tf,α,β,exact,init_cond, bound_cond, num_th
         @cuda threads = num_th_blk blocks = num_block knl_gemv!(dA,u3,dy,dy3)
         d_U[:,n] .= du .+ Δt/6 .* (dy .+ 2*dy1 .+ 2*dy2 .+ dy3)
     end
+    println("Time on the GPU kernels: ", time() - t_start)
     d_U[end,:] .= β
-    d_U[1,:] = surf_bc.(all_t,Δt)
-    return (all_t, cu_U)
+    d_U[1,:] = surf_bc.(t,Δt)
+    return (t, cu_U)
 end
 
 
