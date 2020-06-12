@@ -189,6 +189,7 @@ function solve_GPU(k,Δz,Δt,t1,tf,α,β,exact,init_cond, bound_cond, num_th_blo
     (all_t, cu_U) = cu_naive_rk4(z,Δt, t1, tf, u, A, α, β, exact, bound_cond, num_th_block, num_block)
     end
     println("Time to solve this problem on GPU with cu_naive_rk4 function call: ", (time() - t3)/5)
+    (all_t, cu_U) = cu_naive_rk4(z,Δt, t1, tf, u, A, α, β, exact, bound_cond, num_th_block, num_block)
     return (all_t, cu_U)
 end
 
