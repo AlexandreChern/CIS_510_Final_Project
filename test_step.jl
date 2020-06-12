@@ -205,7 +205,7 @@ function solve_GPU_cusparse(k,Δz,Δt,t1,tf,α,β,exact,init_cond, bound_cond, n
     d_U[end,:] .= β
     d_U[1,:] = surf_bc.(t,Δt)
 
-    return (t, cu_U)
+    return (t, d_U)
 end
 
 k = 2.7
@@ -354,8 +354,8 @@ num_block = cld(N, num_th_blk)
 # println("Time to solve with GPU function call")
 # @time solve_GPU(k,Δz,Δt,t1,tf,α,β,exact, init_cond, surf_bc, num_th_blk, num_block)
 println()
-println("Time for calling GPU kernel")
-@time solve_GPU_new(k,Δz,Δt,t1,tf,α,β,exact, init_cond, surf_bc, num_th_blk, num_block)
+# println("Time for calling GPU kernel")
+# @time solve_GPU_new(k,Δz,Δt,t1,tf,α,β,exact, init_cond, surf_bc, num_th_blk, num_block)
 println()
 println("Time for CPU solve")
 @time time_dependent_heat(k, Δz, Δt, tf ,t1, α, β, init_cond, exact, surf_bc, naive_rk4, num_th_blk, num_block)
@@ -365,14 +365,25 @@ println("Time for CPU solve")
 
 
 ######## This is a test on memory conversion ##########
+using SparseArrays
+using CuArrays
+using BenchmarkTools
 
 N = 100000
 A_N = spzeros(N,N)
 
-Base.summarysize(N)
+for i in 1:N
+    A_N[i,i] = 1
+end
 
-using SparseArrays
-using CuArrays
+for i in 1:N-1
+    A_N[i,i+1] = -1
+end
+
+
+Base.summarysize(A_N)
+
+
 
 cu_A_sparse = sparse(CuArray(A_N))
 
@@ -381,3 +392,19 @@ sizeof(cu_A_sparse)
 cu_A_sparse_new = CuArrays.CUSPARSE.CuSparseMatrixCSC(A_N);
 
 Base.summarysize(cu_A_sparse_new)
+
+sizeof(cu_A_sparse_new)
+
+b = randn(N)
+cu_array = CuArray(b)
+
+cu_A_sparse_new * cu_array
+
+@benchmark cu_A_sparse_new * cu_array
+
+@benchmark A_N * b
+
+A_N * b - Array(cu_A_sparse_new * cu_array)
+
+@benchmark A_N \ b
+@benchmark cu_A_sparse_new \ cu_array
