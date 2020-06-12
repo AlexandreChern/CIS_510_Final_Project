@@ -185,8 +185,10 @@ function solve_GPU(k,Δz,Δt,t1,tf,α,β,exact,init_cond, bound_cond, num_th_blo
     # num_th_block = 32
     # num_block = cld(N, num_th_blk)
     t3 = time()
+    for i in 1:5
     (all_t, cu_U) = cu_naive_rk4(z,Δt, t1, tf, u, A, α, β, exact, bound_cond, num_th_block, num_block)
-    println("Time to solve this problem on GPU with cu_naive_rk4 function call: ", time() - t3)
+    end
+    println("Time to solve this problem on GPU with cu_naive_rk4 function call: ", (time() - t3)/5)
     return (all_t, cu_U)
 end
 
@@ -241,6 +243,7 @@ function solve_GPU_new(k,Δz,Δt,t1,tf,α,β,exact,init_cond, bound_cond, num_th
     u3 = similar(dy)
 
     t_start = time()
+    for i in 1:5
     for n = 2:M+1
         # t = t + Δt
         @cuda threads = num_th_blk blocks = num_block knl_gemvs!(dA,du,dy)
@@ -252,7 +255,8 @@ function solve_GPU_new(k,Δz,Δt,t1,tf,α,β,exact,init_cond, bound_cond, num_th
         @cuda threads = num_th_blk blocks = num_block knl_gemv!(dA,u3,dy,dy3)
         d_U[:,n] .= du .+ Δt/6 .* (dy .+ 2*dy1 .+ 2*dy2 .+ dy3)
     end
-    println("Time on the GPU kernels: ", time() - t_start)
+    end
+    println("Time on the GPU kernels: ", (time() - t_start)/5)
     d_U[end,:] .= β
     d_U[1,:] = surf_bc.(t,Δt)
     return (t, d_U)
